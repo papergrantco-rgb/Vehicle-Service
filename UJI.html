@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Kendaraan</title>
+
+<style>
+body{font-family:Arial;background:#f4f7fb;padding:16px;color:#0d47a1}
+h1{text-align:center}
+
+label{font-size:12px;color:#1565c0;margin-top:8px;display:block}
+
+button{padding:8px 12px;border:none;border-radius:6px;background:#1976d2;color:#fff;cursor:pointer}
+button.secondary{background:#90caf9;color:#0d47a1}
+button.danger{background:#e53935}
+button.small{padding:6px 10px;font-size:12px}
+
+select,input,textarea{
+  width:100%;
+  padding:8px;
+  margin-top:4px;
+  border-radius:6px;
+  border:1px solid #bbdefb
+}
+
+.row{display:flex;gap:8px;flex-wrap:wrap}
+
+.card{
+  background:#fff;
+  padding:14px;
+  border-radius:12px;
+  margin-top:16px;
+  box-shadow:0 4px 12px rgba(0,0,0,.08)
+}
+
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(13,71,161,.45);
+  z-index:99
+}
+.modal-content{
+  background:#fff;
+  margin:4% auto;
+  padding:16px;
+  width:95%;
+  max-width:950px;
+  border-radius:14px;
+  max-height:85vh;
+  overflow:auto
+}
+
+.modal-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center
+}
+.close-btn{
+  background:#e53935;
+  border-radius:50%;
+  width:32px;
+  height:32px;
+  font-weight:bold
+}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px;border-bottom:1px solid #e0e0e0;vertical-align:top}
+th{background:#e3f2fd}
+
+.status-yes{color:#2e7d32;font-weight:bold}
+.status-no{color:#9e9e9e}
+
+.detail-list div{margin-bottom:3px}
+</style>
+</head>
+
+<body>
+
+<h1>SERVICE KENDARAAN</h1>
+
+<div class="row">
+  <select id="vehicleSelect" onchange="renderAll()"></select>
+  <button onclick="openVehicleModal()">+</button>
+  <button onclick="openTransactionModal()">Add Transaction</button>
+  <button class="secondary" onclick="openHistoryModal()">History</button>
+</div>
+
+<div class="card" id="summary"></div>
+<div class="card" id="reminder"></div>
+
+<!-- ================= VEHICLE MODAL ================= -->
+<div class="modal" id="vehicleModal">
+  <div class="modal-content">
+    <h3>Tambah Kendaraan</h3>
+
+    <label>Nama / Merk Kendaraan</label>
+    <input id="merk">
+
+    <label>Tahun</label>
+    <input id="tahun">
+
+    <label>KM Awal</label>
+    <input id="kmAwal" type="number">
+
+    <br><br>
+    <button onclick="saveVehicle()">Save</button>
+    <button class="secondary" onclick="closeVehicleModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- ================= TRANSACTION MODAL ================= -->
+<div class="modal" id="trxModal">
+  <div class="modal-content">
+    <h3>Tambah Transaksi</h3>
+
+    <label>Tanggal Service</label>
+    <input type="date" id="tgl">
+
+    <label>Jenis Service</label>
+    <select id="trxType" onchange="renderTrxForm()">
+      <option value="">Pilih jenis</option>
+      <option value="rutin">Service Rutin</option>
+      <option value="additional">Additional Service</option>
+    </select>
+
+    <div id="trxForm"></div>
+
+    <br>
+    <button onclick="saveTransaction()">Save</button>
+    <button class="secondary" onclick="closeTransactionModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- ================= HISTORY MODAL ================= -->
+<div class="modal" id="historyModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Histori Service</h3>
+      <button class="close-btn" onclick="closeHistoryModal()">×</button>
+    </div>
+    <div id="historyContent"></div>
+  </div>
+</div>
+
+<script>
+let vehicles = JSON.parse(localStorage.getItem('vehicles')||'[]');
+let transactions = JSON.parse(localStorage.getItem('transactions')||'[]');
+
+/* ========= UTIL ========= */
+const rupiah = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR'}).format(n);
+
+/* ========= VEHICLE ========= */
+function refreshVehicleSelect(){
+  vehicleSelect.innerHTML='';
+  vehicles.forEach((v,i)=>{
+    let o=document.createElement('option');
+    o.value=i;
+    o.text=v.merk;
+    vehicleSelect.appendChild(o);
+  });
+}
+
+function saveVehicle(){
+  vehicles.push({
+    merk:merk.value,
+    tahun:tahun.value,
+    kmAwal:+kmAwal.value
+  });
+  localStorage.setItem('vehicles',JSON.stringify(vehicles));
+  closeVehicleModal();
+  refreshVehicleSelect();
+  renderAll();
+}
+
+function openVehicleModal(){vehicleModal.style.display='block'}
+function closeVehicleModal(){vehicleModal.style.display='none'}
+
+/* ========= SUMMARY ========= */
+function renderSummary(){
+  let vId = vehicleSelect.value;
+  let list = transactions.filter(t=>t.vehicleId==vId);
+
+  if(!list.length){
+    summary.innerHTML='Belum ada data service';
+    reminder.innerHTML='Belum ada data';
+    return;
+  }
+
+  let last = list.at(-1);
+  summary.innerHTML=`
+    <b>${vehicles[vId].merk}</b><br>
+    KM Terakhir Service : <b>${last.km} KM</b><br>
+    Tanggal : ${last.date}
+  `;
+
+  reminder.innerHTML=`
+    <b>Reminder Service</b><br>
+    Oli Mesin : ${last.km+6000} KM<br>
+    Filter Udara : ${last.km+6000} KM<br>
+    Oli Gardan : ${last.km+12000} KM<br>
+    Filter Oli : ${last.km+12000} KM
+  `;
+}
+
+/* ========= HISTORY ========= */
+function openHistoryModal(){
+  historyModal.style.display='block';
+  renderHistory();
+}
+function closeHistoryModal(){historyModal.style.display='none'}
+
+function renderHistory(){
+  let vId = vehicleSelect.value;
+  let list = transactions.filter(t=>t.vehicleId==vId);
+
+  if(!list.length){
+    historyContent.innerHTML='Belum ada histori service';
+    return;
+  }
+
+  historyContent.innerHTML=`
+  <table>
+    <tr>
+      <th>Tanggal</th><th>Jenis</th><th>KM</th>
+      <th>Detail</th><th>Biaya</th><th>Aksi</th>
+    </tr>
+    ${list.map(t=>`
+    <tr>
+      <td>${t.date}</td>
+      <td>${t.type}</td>
+      <td>${t.km}</td>
+      <td class="detail-list">
+        ${t.type==='rutin'?`
+          <div>Oli Mesin : <b>${t.oli}</b></div>
+          <div>Oli Gardan :
+            <span class="${t.gardan==='ganti'?'status-yes':'status-no'}">${t.gardan}</span>
+          </div>
+          <div>V-Belt :
+            <span class="${t.vbelt==='ganti'?'status-yes':'status-no'}">${t.vbelt}</span>
+          </div>
+          <div>Filter Udara :
+            <span class="${t.filterUdara==='ganti'?'status-yes':'status-no'}">${t.filterUdara}</span>
+          </div>
+          <div>Filter Oli :
+            <span class="${t.filterOli==='ganti'?'status-yes':'status-no'}">${t.filterOli}</span>
+          </div>
+        `:`${t.others}`}
+      </td>
+      <td>${rupiah(t.biaya)}</td>
+      <td>
+        <button class="danger small" onclick="deleteTransaction(${transactions.indexOf(t)})">
+          Delete
+        </button>
+      </td>
+    </tr>
+    `).join('')}
+  </table>`;
+}
+
+/* ========= TRANSACTION ========= */
+function openTransactionModal(){trxModal.style.display='block'}
+function closeTransactionModal(){trxModal.style.display='none'}
+
+function renderTrxForm(){
+  if(trxType.value==='rutin'){
+    trxForm.innerHTML=`
+      <label>KM Terakhir</label>
+      <input id="kmLast" type="number">
+
+      <label>Merk Oli Mesin</label>
+      <input id="oli">
+
+      <label>Oli Gardan</label>
+      <select id="gardan">
+        <option value="ganti">Ganti</option>
+        <option value="tidak">Tidak</option>
+      </select>
+
+      <label>V-Belt</label>
+      <select id="vbelt">
+        <option value="ganti">Ganti</option>
+        <option value="tidak">Tidak</option>
+      </select>
+
+      <label>Filter Udara</label>
+      <select id="filterUdara">
+        <option value="ganti">Ganti</option>
+        <option value="tidak">Tidak</option>
+      </select>
+
+      <label>Filter Oli</label>
+      <select id="filterOli">
+        <option value="ganti">Ganti</option>
+        <option value="tidak">Tidak</option>
+      </select>
+
+      <label>Catatan Tambahan</label>
+      <textarea id="others"></textarea>
+
+      <label>Biaya Total</label>
+      <input id="biaya" type="number">
+    `;
+  }else if(trxType.value==='additional'){
+    trxForm.innerHTML=`
+      <label>Catatan Service</label>
+      <textarea id="others"></textarea>
+
+      <label>Biaya Total</label>
+      <input id="biaya" type="number">
+    `;
+  }else{
+    trxForm.innerHTML='';
+  }
+}
+
+function saveTransaction(){
+  transactions.push({
+    vehicleId:vehicleSelect.value,
+    date:tgl.value,
+    type:trxType.value,
+    km:+kmLast?.value||0,
+    oli:oli?.value||'',
+    gardan:gardan?.value||'',
+    vbelt:vbelt?.value||'',
+    filterUdara:filterUdara?.value||'',
+    filterOli:filterOli?.value||'',
+    others:others?.value||'',
+    biaya:+biaya.value||0
+  });
+  localStorage.setItem('transactions',JSON.stringify(transactions));
+  closeTransactionModal();
+  renderAll();
+}
+
+/* ========= DELETE ========= */
+function deleteTransaction(i){
+  if(!confirm('Hapus transaksi ini?')) return;
+  transactions.splice(i,1);
+  localStorage.setItem('transactions',JSON.stringify(transactions));
+  renderHistory();
+  renderSummary();
+}
+
+/* ========= INIT ========= */
+function renderAll(){renderSummary()}
+refreshVehicleSelect();
+renderAll();
+</script>
+
+</body>
+</html>
