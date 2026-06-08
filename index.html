@@ -178,6 +178,7 @@ function openVehicleModal(){vehicleModal.style.display='block'}
 function closeVehicleModal(){vehicleModal.style.display='none'}
 
 /* ========= SUMMARY ========= */
+/* ========= SUMMARY ========= */
 function renderSummary(){
   let vId = vehicleSelect.value;
   let list = transactions.filter(t=>t.vehicleId==vId);
@@ -189,6 +190,36 @@ function renderSummary(){
   }
 
   let last = list.at(-1);
+
+  // KM terakhir masing-masing item diganti
+  let kmOli = vehicles[vId].kmAwal || 0;
+  let kmGardan = vehicles[vId].kmAwal || 0;
+  let kmFilterUdara = vehicles[vId].kmAwal || 0;
+  let kmFilterOli = vehicles[vId].kmAwal || 0;
+
+  list.forEach(t=>{
+
+    if(t.type !== 'rutin') return;
+
+    // setiap service rutin dianggap ganti oli mesin
+    if(t.km > 0){
+      kmOli = t.km;
+    }
+
+    if(t.gardan === 'ganti'){
+      kmGardan = t.km;
+    }
+
+    if(t.filterUdara === 'ganti'){
+      kmFilterUdara = t.km;
+    }
+
+    if(t.filterOli === 'ganti'){
+      kmFilterOli = t.km;
+    }
+
+  });
+
   summary.innerHTML=`
     <b>${vehicles[vId].merk}</b><br>
     KM Terakhir Service : <b>${last.km} KM</b><br>
@@ -197,10 +228,10 @@ function renderSummary(){
 
   reminder.innerHTML=`
     <b>Reminder Service</b><br>
-    Next Services (Ganti Oli Mesin): ${last.km+2000} KM<br> 
-    Oli Gardan : ${last.km+4000} KM<br>
-    Filter Udara : ${last.km+6000} KM<br>
-    Filter Oli : ${last.km+12000} KM
+    Next Services (Ganti Oli Mesin): ${kmOli + 2000} KM<br>
+    Oli Gardan : ${kmGardan + 4000} KM<br>
+    Filter Udara : ${kmFilterUdara + 6000} KM<br>
+    Filter Oli : ${kmFilterOli + 12000} KM
   `;
 }
 
